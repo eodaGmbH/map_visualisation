@@ -1,6 +1,7 @@
 
 #packages####
 library("maptools")
+library("plyr")
 library("dplyr")
 library("RColorBrewer")
 library("osmar")
@@ -34,13 +35,20 @@ districts_data$District[districts_data$District == "Wolfsanger/Hasenhecke"] <- "
 #merging datasets
 districts_data <- merge(districts_data, districts_ks, all.x = TRUE)
 
+#count number of postal code areas each district intersects with
+districts_data <- ddply(districts_data, 
+                        c("District"), 
+                        transform, 
+                        cntPostalcode = length(Households))
 
 
-#aggregation by postalcode
-data.agg <- districts_data%>%
-  group_by(Postalcode)%>%
-  summarise(District = paste(unique(District),collapse = " & ") , Households = sum(Households),
-            cars = sum(private.used.cars.per.1000.residents))
+#aggregation by postalcode, accounting for partial overlaps
+data.agg <- ddply(districts_data, 
+                  c("Postalcode"), 
+                  summarize, 
+                  District = paste(unique(District),collapse = " & "), 
+                  Households = sum(Households / cntPostalcode), 
+                  cars = sum(private.used.cars.per.1000.residents / cntPostalcode))
 
 data.agg
 
@@ -52,8 +60,8 @@ summary(data.agg$Households)
 
 
 #define classes for number of households
-classes <- cut(data.agg$Households[position], c(0,6000,10000,15000,20000,25000))
-levels(classes) <- c("under 6000", "6000 - 10000", "10000 - 15000", "15000 - 20000","20000 - 25000")
+classes <- cut(data.agg$Households[position], c(0,2000,5000,10000,15000,20000))
+levels(classes) <- c("under 2000", "2000 - 5000", "5000 - 10000", "10000 - 15000","15000 - 20000")
 
 colours <- c("#73AC97", "#489074", "#267356", "#0E563B", "#003924")
 
